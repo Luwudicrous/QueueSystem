@@ -167,14 +167,14 @@ const UserHome = () => {
     setCurrentQueue((prev) => ({ ...prev, status: nextStatus }));
 
     if (nextStatus === "almost ready") {
-      notify("Status update: Almost Ready");
-      // optional: reduce ETA a bit
-      setCurrentQueue((prev) => ({
-        ...prev,
-        etaMinutes: prev.etaMinutes ? Math.max(1, Math.floor(prev.etaMinutes / 2)) : prev.etaMinutes,
-        position: prev.position ? Math.max(1, Math.floor(prev.position / 2)) : prev.position,
-        status: "almost ready",
-      }));
+        notify("Status update: Almost Ready");
+        setCurrentQueue((prev) => ({
+            ...prev,
+            status: "almost ready",
+            etaMinutes: prev.etaMinutes ? Math.max(1, Math.floor(prev.etaMinutes / 2)) : prev.etaMinutes,
+            position: prev.position ? Math.max(1, Math.floor(prev.position / 2)) : prev.position,
+        }));
+        return;
     }
 
     if (nextStatus === "served") {
