@@ -118,7 +118,7 @@ const AdminHome = () => {
 
         {/* SERVICE MANAGEMENT */}
         {page === "services" && (
-          <ServiceManager services={services} setServices={setServices}/>
+          <ServiceManager services={services} setServices={setServices} notify={notify}/>
         )}
 
         {/* QUEUE MANAGEMENT */}
