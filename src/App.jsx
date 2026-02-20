@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import LoginSign from './login_sign/login_sign'
-import AdminHome from './login_sign/admin_home_temp'
+import AdminHome from './login_sign/admin_home'
 import UserHome from './login_sign/user_home_temp'
 import './App.css'
 
