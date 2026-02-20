@@ -163,7 +163,7 @@ const UserHome = () => {
       notify("Join a queue to see status updates.");
       return;
     }
-    
+
     if (nextStatus === "waiting") {
         notify("Status update: Waiting");
         setCurrentQueue((prev) => ({ ...prev, status: "waiting" }));
@@ -205,6 +205,7 @@ const UserHome = () => {
         status: "waiting",
         joinedAt: null,
       });
+      return
     }
   };
 
