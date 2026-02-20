@@ -159,7 +159,7 @@ const AdminHome = () => {
 
 /* ---------------- SERVICE MANAGER COMPONENT ---------------- */
 
-const ServiceManager = ({ services, setServices }) => {
+const ServiceManager = ({ services, setServices, notify }) => {
 
   const [form, setForm] = useState({
     name: "",
