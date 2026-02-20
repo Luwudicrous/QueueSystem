@@ -11,6 +11,23 @@ const LoginSign = () => {
     const navigate = useNavigate();
 
     const handleLogin = () => {
+        if (!email.trim()) {
+            alert("Email is required.");
+            return;
+        }
+        if (!password.trim()) {
+            alert("Password is required.");
+            return;
+        }
+        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        if (!emailOk) {
+            alert("Please enter a valid email address.");
+            return;
+        }
+        if (password.length < 6) {
+            alert("Password must be at least 6 characters.");
+            return;
+        }
         // Temporary Logins
         console.log("Logging in with:", { email, password });
         const admintestEmail = "admin@queuesmart.com"
