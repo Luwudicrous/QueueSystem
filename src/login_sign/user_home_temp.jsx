@@ -163,8 +163,12 @@ const UserHome = () => {
       notify("Join a queue to see status updates.");
       return;
     }
-
-    setCurrentQueue((prev) => ({ ...prev, status: nextStatus }));
+    
+    if (nextStatus === "waiting") {
+        notify("Status update: Waiting");
+        setCurrentQueue((prev) => ({ ...prev, status: "waiting" }));
+    return;
+    }
 
     if (nextStatus === "almost ready") {
         notify("Status update: Almost Ready");
