@@ -76,11 +76,16 @@ function updateService(id, fields) {
   }
 
   // Validate if core fields are being changed
-  if (updates.name || updates.description || updates.duration || updates.priority) {
-    const merged = { ...store.services[idx], ...updates };
-    const check = validateService(merged);
-    if (!check.valid) return { success: false, error: check.error };
-  }
+  if (
+    updates.name !== undefined ||
+    updates.description !== undefined ||
+    updates.duration !== undefined ||
+    updates.priority !== undefined) 
+    {
+      const merged = { ...store.services[idx], ...updates };
+      const check = validateService(merged);
+      if (!check.valid) return { success: false, error: check.error };
+    }
 
   store.services[idx] = { ...store.services[idx], ...updates };
   return { success: true, service: getServiceById(id) };
