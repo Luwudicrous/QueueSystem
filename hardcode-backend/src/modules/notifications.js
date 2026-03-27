@@ -17,9 +17,8 @@ function triggerNotification({ userId, type, message }) {
 // Gets the unread notifications for a user
 function getNotifications(userId) {
   return store.notifications
-    // sorted by most recent first
     .filter((n) => n.userId === userId)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    .sort((a, b) => b.id - a.id);
 }
 
 function markRead(notifId) {
