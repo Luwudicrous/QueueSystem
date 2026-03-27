@@ -2,50 +2,75 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import './login_sign.css'
 
+const API = "http://localhost:5000/api";
 
 const LoginSign = () => {
 
-    const [action,setAction] = useState("Sign Up");
-    const [email,setEmail] = useState("");
-    const [password,setPassword] = useState("");
+    const [action, setAction] = useState("Sign Up");
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleLogin = () => {
-        if (!email.trim()) {
-            alert("Email is required.");
-            return;
-        }
-        if (!password.trim()) {
-            alert("Password is required.");
-            return;
-        }
-        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-        if (!emailOk) {
-            alert("Please enter a valid email address.");
-            return;
-        }
-        if (password.length < 6) {
-            alert("Password must be at least 6 characters.");
-            return;
-        }
-        // Temporary Logins
-        console.log("Logging in with:", { email, password });
-        const admintestEmail = "admin@queuesmart.com"
-        const admintestPassword = "admin123"
+    const handleLogin = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`${API}/auth/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            const data = await res.json();
 
-        const usertestEmail = "testuser@gmail.com"
-        const usertestPassword = "test123"
+            if (!res.ok) {
+                alert(data.error || "Login failed.");
+                return;
+            }
 
-        if (email === admintestEmail && password === admintestPassword) {
-            alert("Admin Login Successful!");
-            navigate("/admin_home_temp"); // Navigate to admin home page
-        } else if (email === usertestEmail && password === usertestPassword) {
-            alert("User Login Successful!");
-            navigate("/user_home_temp"); // Navigate to user home page
-        } else {
-            alert("Invalid email or password. Please try again.");
+            // Store logged-in user info in sessionStorage so other pages can read it
+            sessionStorage.setItem("user", JSON.stringify(data.user));
+
+            alert(`${data.user.role === "admin" ? "Admin" : "User"} Login Successful!`);
+
+            if (data.user.role === "admin") {
+                navigate("/admin_home_temp");
+            } else {
+                navigate("/user_home_temp");
+            }
+        } catch (err) {
+            alert("Could not reach the server. Make sure the backend is running on port 5000.");
+        } finally {
+            setLoading(false);
         }
-    }
+    };
+
+    const handleSignUp = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`${API}/auth/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, email, password }),
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(data.error || "Registration failed.");
+                return;
+            }
+
+            alert("Registration successful! Please log in.");
+            setAction("Login");
+            setName("");
+            setEmail("");
+            setPassword("");
+        } catch (err) {
+            alert("Could not reach the server. Make sure the backend is running on port 5000.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="login-sign-background">
@@ -57,14 +82,22 @@ const LoginSign = () => {
         <div className="login-sign-container">
             <div className="header">
                 <div className="text">{action}
-                    <div className="underline">
-                    </div>
+                    <div className="underline"></div>
                 </div>
             </div>
             
             <div className="inputs">
 
-                {action==="Login"?null:<div className="input"><input type="text" placeholder="Name" /></div>}
+                {action === "Login" ? null : (
+                    <div className="input">
+                        <input
+                            type="text"
+                            placeholder="Name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                        />
+                    </div>
+                )}
 
                 <div className="input">
                     <input 
@@ -86,26 +119,39 @@ const LoginSign = () => {
             </div>
 
             <div className="submit-box">
-                <div className={action==="Login"?"submit gray":"submit"} onClick={()=>{setAction("Sign Up")}}>Sign Up</div>
-                <div className={action==="Sign Up"?"submit gray":"submit"} 
-                    onClick={()=>{
-                        if(action === "Login"){
+                <div
+                    className={action === "Login" ? "submit gray" : "submit"}
+                    onClick={() => {
+                        if (action === "Sign Up") {
+                            handleSignUp();
+                        } else {
+                            setAction("Sign Up");
+                        }
+                    }}
+                >
+                    {loading && action === "Sign Up" ? "..." : "Sign Up"}
+                </div>
+
+                <div
+                    className={action === "Sign Up" ? "submit gray" : "submit"}
+                    onClick={() => {
+                        if (action === "Login") {
                             handleLogin();
                         } else {
                             setAction("Login");
                         }
-                    }}>
-                        Log-In
+                    }}
+                >
+                    {loading && action === "Login" ? "..." : "Log-In"}
                 </div>
             </div>
-            {action==="Sign Up"?null:
-            <div className="forgot-password">Lost your Password?
-            </div>
-            }
+
+            {action === "Sign Up" ? null : (
+                <div className="forgot-password">Lost your Password?</div>
+            )}
         </div>
         </div>
     )
 }
-
 
 export default LoginSign
