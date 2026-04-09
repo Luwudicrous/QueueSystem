@@ -1,7 +1,3 @@
-// ============================================================
-//  tests/auth.test.js  –  Unit tests for Authentication Module
-// ============================================================
-
 const auth = require("../src/modules/auth");
 const store = require("../src/store");
 
@@ -11,7 +7,7 @@ beforeEach(() => {
   store.users.splice(2);
 });
 
-// ==================== validateRegistration ====================
+// Validates Registration
 
 describe("validateRegistration", () => {
   test("returns valid for correct input", () => {
@@ -55,8 +51,7 @@ describe("validateRegistration", () => {
   });
 });
 
-// ==================== register ====================
-
+// Register and login logic
 describe("register", () => {
   test("successfully registers a new user", () => {
     const result = auth.register({ name: "Alice", email: "alice@new.com", password: "password1" });
@@ -89,8 +84,6 @@ describe("register", () => {
     expect(result.success).toBe(false);
   });
 });
-
-// ==================== login ====================
 
 describe("login", () => {
   test("successfully logs in hardcoded admin", () => {

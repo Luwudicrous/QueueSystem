@@ -1,22 +1,14 @@
-// ============================================================
-//  modules/history.js  –  History Module
-//  Tracks queue participation outcomes per user.
-// ============================================================
-
 const store = require("../store");
 
-/**
- * Get history for a specific user (most recent first).
- */
+// Gets the history of each user.
 function getUserHistory(userId) {
   return store.history
+    // Filters by most recent first
     .filter((h) => h.userId === userId)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 }
 
-/**
- * Get full history (admin use).
- */
+// Gets the full history of users (Admin use)
 function getAllHistory() {
   return [...store.history].sort(
     (a, b) => new Date(b.date) - new Date(a.date)

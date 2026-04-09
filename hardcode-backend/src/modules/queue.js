@@ -1,12 +1,5 @@
-// ============================================================
-//  modules/queue.js  –  Queue Management + Wait-Time Estimation
-//  Handles: join, leave, serve next, view queue, ETA calc
-// ============================================================
-
 const store = require("../store");
 const notifModule = require("./notifications");
-
-// ---------- Wait-time estimation ----------
 
 // Estimate how long a user at `position` (1-based) will wait given a service's expected duration per person.
 // Formula: (position - 1) * duration   (they wait for everyone ahead)
