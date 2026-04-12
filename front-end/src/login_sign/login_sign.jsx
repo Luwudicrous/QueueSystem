@@ -29,11 +29,12 @@ const LoginSign = () => {
             }
 
             // Store logged-in user info in sessionStorage so other pages can read it
-            sessionStorage.setItem("user", JSON.stringify(data.user));
+            sessionStorage.setItem("token", data.token);
+            sessionStorage.setItem("user", JSON.stringify({ role: data.role, name: data.name }));
+            
+            alert(`${data.role === "admin" ? "Admin" : "User"} Login Successful!`);
 
-            alert(`${data.user.role === "admin" ? "Admin" : "User"} Login Successful!`);
-
-            if (data.user.role === "admin") {
+            if (data.role === "admin") {
                 navigate("/admin_home_temp");
             } else {
                 navigate("/user_home_temp");

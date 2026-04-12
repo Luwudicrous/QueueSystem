@@ -2,6 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react'
 import './admin_home.css'
 
 const API = "http://localhost:5000/api";
+const token = () => sessionStorage.getItem("token");
+const authHeaders = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token()}`,
+});
 
 const AdminHome = () => {
 
@@ -22,7 +27,7 @@ const AdminHome = () => {
     // Fetches all services from backend
     const fetchServices = useCallback(async () => {
         try {
-            const res = await fetch(`${API}/services`);
+            const res = await fetch(`${API}/services`, { headers: authHeaders() });
             const data = await res.json();
             setServices(data);
         } catch {
@@ -33,7 +38,7 @@ const AdminHome = () => {
     // Fetch the live queue for one service
     const fetchQueue = useCallback(async (serviceId) => {
         try {
-            const res = await fetch(`${API}/queue/${serviceId}`);
+            const res = await fetch(`${API}/queue/${serviceId}`, { headers: authHeaders() });
             const data = await res.json();
             setQueues(prev => ({ ...prev, [serviceId]: data }));
         } catch {
@@ -53,11 +58,11 @@ const AdminHome = () => {
 
     const toggleQueue = async (id) => {
         try {
-            const res = await fetch(`${API}/services/${id}/toggle`, { method: "PATCH" });
+            const res = await fetch(`${API}/services/${id}/toggle`, { method: "PATCH", headers: authHeaders() });
             const updated = await res.json();
             if (!res.ok) { notify(updated.error); return; }
             setServices(prev => prev.map(s => s.id === id ? updated : s));
-            notify(`Queue ${updated.open ? "opened" : "closed"} for ${updated.name}`);
+            notify(`Queue ${updated.is_open ? "opened" : "closed"} for ${updated.name}`);
         } catch {
             notify("Error toggling queue.");
         }
@@ -67,7 +72,7 @@ const AdminHome = () => {
     const serveNext = async () => {
         if (!selectedId) return;
         try {
-            const res = await fetch(`${API}/queue/${selectedId}/serve-next`, { method: "POST" });
+            const res = await fetch(`${API}/queue/${selectedId}/serve-next`, { method: "POST", headers: authHeaders() });
             const data = await res.json();
             if (!res.ok) { notify(data.error); return; }
             notify(data.message);
@@ -83,7 +88,7 @@ const AdminHome = () => {
         try {
             const res = await fetch(`${API}/queue/leave`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: authHeaders(),
                 body: JSON.stringify({ userId: entry.userId, serviceId: entry.serviceId }),
             });
             const data = await res.json();
@@ -126,10 +131,9 @@ const AdminHome = () => {
                         {services.map(service => (
                             <div key={service.id} className="card">
                                 <h3>{service.name}</h3>
-                                <p>Queue Length: {service.queueLength}</p>
-                                <p>Status: {service.open ? "Open" : "Closed"}</p>
+                                <p>Status: {service.is_open ? "Open" : "Closed"}</p>
                                 <button onClick={() => toggleQueue(service.id)}>
-                                    {service.open ? "Close Queue" : "Open Queue"}
+                                    {service.is_open ? "Close Queue" : "Open Queue"}
                                 </button>
                             </div>
                         ))}
@@ -168,7 +172,7 @@ const AdminHome = () => {
 
                                 {selectedQueue.map((entry) => (
                                     <div key={entry.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                                        <span>#{entry.position} — {entry.userName} (ETA: {entry.etaMinutes} min)</span>
+                                        <span>#{entry.position} - {entry.user_name} - Wait: {entry.estimated_wait} min</span>
                                         <button onClick={() => removeUser(entry)}>Remove</button>
                                     </div>
                                 ))}
@@ -206,7 +210,7 @@ const ServiceManager = ({ services, fetchServices, notify }) => {
         try {
             const res = await fetch(`${API}/services`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: authHeaders(),
                 body: JSON.stringify({
                     name: form.name,
                     description: form.description,
@@ -271,7 +275,7 @@ const ServiceManager = ({ services, fetchServices, notify }) => {
             <h3>Existing Services</h3>
             {services.map(s => (
                 <div key={s.id} className="card">
-                    {s.name} — {s.priority} — {s.open ? "Open" : "Closed"} — {s.queueLength} in queue
+                    {s.name} — {s.priority} — {s.is_open ? "Open" : "Closed"}
                 </div>
             ))}
         </div>

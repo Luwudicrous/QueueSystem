@@ -1,10 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const auth = require("../modules/auth");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const db = require("../db");
-const { SECRET } = require("../../middleware/auth");
+const { SECRET } = require("../../middleware/mid_auth");
 
 // POST /api/auth/register
 router.post("/register", async (req, res) => {
