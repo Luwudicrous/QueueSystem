@@ -4,7 +4,7 @@ const auth = require("../modules/auth");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const db = require("../db");
-const { getUserHistory } = require("../modules/history");
+const { SECRET } = require("../../middleware/auth");
 
 // POST /api/auth/register
 router.post("/register", async (req, res) => {

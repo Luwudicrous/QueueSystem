@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const history = require("../modules/history");
+const { authenticate, adminOnly } = require("../../middleware/auth");
 
 // Gets the user's own history
 router.get("/:userId", authenticate, async (req, res) => {
