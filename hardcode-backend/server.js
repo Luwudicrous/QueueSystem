@@ -1,18 +1,24 @@
 const express = require("express");
 const cors = require("cors");
 
+const authRoutes = require("./src/routes/auth");
+const servicesRoutes = require("./src/routes/services");
+const queueRoutes = require("./src/routes/queue");
+const notificastionsRoutes = require("./src/routes/notifications");
+const historyRoutes = require("./src/routes/history");
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());                       // allow React dev server on :5173
+app.use(cors({ origin: 'http://localhost:5173' }));  // allow React dev server on :5173
 app.use(express.json());               // parse JSON bodies
 
 // Routes
-app.use("/api/auth",          require("./src/routes/auth"));
-app.use("/api/services",      require("./src/routes/services"));
-app.use("/api/queue",         require("./src/routes/queue"));
-app.use("/api/notifications", require("./src/routes/notifications"));
-app.use("/api/history",       require("./src/routes/history"));
+app.use("/api/auth",          authRoutes);
+app.use("/api/services",      servicesRoutes);
+app.use("/api/queue",         queueRoutes);
+app.use("/api/notifications", notificastionsRoutes);
+app.use("/api/history",       historyRoutes);
 
 // Health checks for monitoring and testing
 app.get("/api/health", (req, res) => {
