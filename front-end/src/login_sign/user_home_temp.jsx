@@ -20,6 +20,12 @@ const UserHome = () => {
         setTimeout(() => setNotification(null), 2500);
     };
 
+    const handleLogout = () => {
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("user");
+        window.location.href = "/";
+    };
+
     // Nav tab
     const [page, setPage] = useState("dashboard");
 
@@ -28,6 +34,10 @@ const UserHome = () => {
     const [currentQueue, setCurrentQueue] = useState({ inQueue: false });
     const [history, setHistory] = useState([]);
     const [backendNotifs, setBackendNotifs] = useState([]);
+
+    // For the Smart Feature
+    const [recommendation, setRecommendation] = useState(null);
+    const [bestTime, setBestTime] = useState(null);
 
     // Join Queue
     const [selectedServiceId, setSelectedServiceId] = useState("");
@@ -73,6 +83,21 @@ const UserHome = () => {
         }
     }, [userId]);
 
+    // Smart Feature: fetch recommendation when a service is selected
+    const fetchRecommendation = useCallback(async (serviceId) => {
+        if (!serviceId) { setRecommendation(null); setBestTime(null); return; }
+        try {
+            const [recRes, timeRes] = await Promise.all([
+                fetch(`${API}/smart/recommend/${serviceId}`, { headers: authHeaders() }),
+                fetch(`${API}/smart/best-time/${serviceId}`, { headers: authHeaders() }),
+            ]);
+            const recData  = await recRes.json();
+            const timeData = await timeRes.json();
+            if (recRes.ok)  setRecommendation(recData);
+            if (timeRes.ok) setBestTime(timeData);
+        } catch {}
+    }, []);
+
     // Load everything on mount
     useEffect(() => {
         fetchServices();
@@ -80,6 +105,11 @@ const UserHome = () => {
         fetchHistory();
         fetchNotifications();
     }, [fetchServices, fetchStatus, fetchHistory, fetchNotifications]);
+
+    // Fetches smart data whenever service selection changes
+    useEffect(() => {
+        fetchRecommendation(selectedServiceId);
+    }, [selectedServiceId, fetchRecommendation]);
 
     // Derived values
     const activeServices = useMemo(() => services.filter((s) => s.is_open), [services]);
@@ -151,6 +181,10 @@ const UserHome = () => {
                 <div className="header">
                     User Portal
                     <div className="underline"></div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: "8px" }}>
+                    <button className="submit" onClick={handleLogout}>Logout</button>
                 </div>
 
                 {notification && (
@@ -253,6 +287,39 @@ const UserHome = () => {
                                     <h3>{selectedService.name}</h3>
                                     <p>{selectedService.description}</p>
                                     <p>Expected Duration: <b>{selectedService.expected_duration} min</b></p>
+                                </div>
+                            )}
+
+                            {/* SMART FEATURE — Alternative Service Recommendation */}
+                            {recommendation && recommendation.has_alternatives && (
+                                <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "#fff8e1", borderRadius: "8px", border: "1px solid #ffe082" }}>
+                                    <h4 style={{ margin: "0 0 8px 0" }}>💡 Smart Suggestion</h4>
+                                    <p style={{ margin: "0 0 8px 0" }}>
+                                        Your selected service has an estimated wait of <b>{recommendation.selected_service.estimated_wait} min</b>.
+                                        These alternatives have shorter wait times:
+                                    </p>
+                                    {recommendation.alternatives.map(alt => (
+                                        <div key={alt.id} style={{ marginBottom: "8px", padding: "8px", backgroundColor: "#f1f8e9", borderRadius: "6px" }}>
+                                            <b>{alt.name}</b> — {alt.estimated_wait} min wait
+                                            <span style={{ color: "green", marginLeft: "8px" }}>
+                                                (saves {alt.time_saved} min)
+                                            </span>
+                                            <button
+                                                style={{ marginLeft: "12px" }}
+                                                onClick={() => setSelectedServiceId(String(alt.id))}
+                                            >
+                                                Switch
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* SMART FEATURE — Best Time Suggestion */}
+                            {bestTime && bestTime.best_hours && bestTime.best_hours.length > 0 && (
+                                <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "#e3f2fd", borderRadius: "8px", border: "1px solid #90caf9" }}>
+                                    <h4 style={{ margin: "0 0 8px 0" }}>🕐 Best Time to Join</h4>
+                                    <p style={{ margin: 0 }}>{bestTime.suggestion}</p>
                                 </div>
                             )}
 

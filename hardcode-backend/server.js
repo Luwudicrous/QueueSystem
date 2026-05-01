@@ -6,6 +6,8 @@ const servicesRoutes = require("./src/routes/services");
 const queueRoutes = require("./src/routes/queue");
 const notificastionsRoutes = require("./src/routes/notifications");
 const historyRoutes = require("./src/routes/history");
+const reportsRoutes = require("./src/routes/reports");
+const smartRoutes   = require("./src/routes/smart");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -14,11 +16,13 @@ app.use(cors({ origin: 'http://localhost:5173' }));  // allow React dev server o
 app.use(express.json());               // parse JSON bodies
 
 // Routes
-app.use("/api/auth",          authRoutes);
-app.use("/api/services",      servicesRoutes);
-app.use("/api/queue",         queueRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/services", servicesRoutes);
+app.use("/api/queue", queueRoutes);
 app.use("/api/notifications", notificastionsRoutes);
-app.use("/api/history",       historyRoutes);
+app.use("/api/history", historyRoutes);
+app.use("/api/reports", reportsRoutes);
+app.use("/api/smart", smartRoutes);
 
 // Health checks for monitoring and testing
 app.get("/api/health", (req, res) => {

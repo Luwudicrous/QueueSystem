@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import ReportsPage from './ReportsPage'
 import './admin_home.css'
 
 const API = "http://localhost:5000/api";
@@ -22,6 +23,12 @@ const AdminHome = () => {
     const notify = (msg) => {
         setNotification(msg);
         setTimeout(() => setNotification(null), 2500);
+    };
+
+    const handleLogout = () => {
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("user");
+        window.location.href = "/";
     };
 
     // Fetches all services from backend
@@ -112,6 +119,10 @@ const AdminHome = () => {
                     <div className="underline"></div>
                 </div>
 
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: "8px" }}>
+                    <button className="submit" onClick={handleLogout}>Logout</button>
+                </div>
+
                 {notification && (
                     <div className="login-sign-container">{notification}</div>
                 )}
@@ -121,6 +132,7 @@ const AdminHome = () => {
                     <button className="submit" onClick={() => { setPage("dashboard"); fetchServices(); }}>Dashboard</button>
                     <button className="submit" onClick={() => { setPage("services"); fetchServices(); }}>Services</button>
                     <button className="submit" onClick={() => setPage("queue")}>Queue</button>
+                    <button className="submit" onClick={() => setPage("reports")}>Reports</button>
                 </div>
 
                 {/* Dashboard */}
@@ -183,6 +195,10 @@ const AdminHome = () => {
                             </div>
                         )}
                     </div>
+                )}
+                {/* Reports */}
+                {page === "reports" && (
+                    <ReportsPage notify={notify} />
                 )}
 
             </div>
