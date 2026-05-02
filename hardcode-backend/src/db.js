@@ -5,7 +5,7 @@ const pool = mysql.createPool({
     user: 'root',
 
     // Password I used for my instance, replace with your own.
-    password: 'ynYPUJ@aq97',
+    password: '',
 
     database: 'queuesys',
     waitForConnections: true,

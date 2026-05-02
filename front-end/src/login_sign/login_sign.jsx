@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import './login_sign.css'
 
-const API = "http://localhost:5000/api";
+const API = "http://localhost:5001/api";
 
 const LoginSign = () => {
 
@@ -40,7 +40,7 @@ const LoginSign = () => {
                 navigate("/user_home_temp");
             }
         } catch (err) {
-            alert("Could not reach the server. Make sure the backend is running on port 5000.");
+            alert("Could not reach the server. Make sure the backend is running on port 5001.");
         } finally {
             setLoading(false);
         }
@@ -67,7 +67,7 @@ const LoginSign = () => {
             setEmail("");
             setPassword("");
         } catch (err) {
-            alert("Could not reach the server. Make sure the backend is running on port 5000.");
+            alert("Could not reach the server. Make sure the backend is running on port 5001.");
         } finally {
             setLoading(false);
         }
