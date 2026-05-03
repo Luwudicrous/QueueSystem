@@ -1,0 +1,4 @@
+hardcode-backend/localenv.env
+.env
+node_modules
+coverage
