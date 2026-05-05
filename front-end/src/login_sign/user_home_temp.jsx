@@ -1,7 +1,7 @@
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import "./user_home_temp.css";
 
-const API = "http://localhost:5001/api";
+const API = "http://localhost:5000/api";
 const token = () => sessionStorage.getItem("token");
 const authHeaders = () => ({
     "Content-Type": "application/json",
@@ -9,16 +9,85 @@ const authHeaders = () => ({
 });
 
 const UserHome = () => {
-    // Gets the logged-in user from sessionStorage (set by the login page)
     const loggedInUser = JSON.parse(sessionStorage.getItem("user") || "null");
-    const userId = loggedInUser?.id || 2;
-    const userName = loggedInUser?.name || "Test User";
+    const userName     = loggedInUser?.name || "User";
 
-    const [notification, setNotification] = useState(null);
-    const notify = (msg) => {
-        setNotification(msg);
-        setTimeout(() => setNotification(null), 2500);
-    };
+    // Decode user id from JWT
+    const userId = useMemo(() => {
+        try { return JSON.parse(atob(token().split(".")[1])).id; }
+        catch { return 2; }
+    }, []);
+
+    const [toast, setToast]               = useState(null);
+    const [page, setPage]                 = useState("dashboard");
+    const [services, setServices]         = useState([]);
+    const [currentQueue, setCurrentQueue] = useState({ inQueue: false });
+    const [history, setHistory]           = useState([]);
+    const [notifications, setNotifications] = useState([]);
+    const [selectedServiceId, setSelectedServiceId] = useState("");
+    const [recommendation, setRecommendation]       = useState(null);
+    const [bestTime, setBestTime]                   = useState(null);
+    const [joining, setJoining]                     = useState(false);
+    const [leaving, setLeaving]                     = useState(false);
+    const pollRef = useRef(null);
+
+    const notify = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+
+    const fetchServices = useCallback(async () => {
+        try {
+            const res  = await fetch(`${API}/services`, { headers: authHeaders() });
+            const data = await res.json();
+            if (res.ok) setServices(data);
+        } catch {}
+    }, []);
+
+    const fetchStatus = useCallback(async () => {
+        try {
+            const res  = await fetch(`${API}/queue/status/${userId}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (res.ok) setCurrentQueue(data);
+        } catch {}
+    }, [userId]);
+
+    const fetchHistory = useCallback(async () => {
+        try {
+            const res  = await fetch(`${API}/history/${userId}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (res.ok) setHistory(data);
+        } catch {}
+    }, [userId]);
+
+    const fetchNotifications = useCallback(async () => {
+        try {
+            const res  = await fetch(`${API}/notifications/${userId}`, { headers: authHeaders() });
+            const data = await res.json();
+            if (res.ok) setNotifications(data);
+        } catch {}
+    }, [userId]);
+
+    const fetchRecommendation = useCallback(async (serviceId) => {
+        if (!serviceId) { setRecommendation(null); setBestTime(null); return; }
+        try {
+            const [r1, r2] = await Promise.all([
+                fetch(`${API}/smart/recommend/${serviceId}`, { headers: authHeaders() }),
+                fetch(`${API}/smart/best-time/${serviceId}`, { headers: authHeaders() }),
+            ]);
+            if (r1.ok) setRecommendation(await r1.json());
+            if (r2.ok) setBestTime(await r2.json());
+        } catch {}
+    }, []);
+
+    // Initial load + auto-refresh every 5 seconds
+    useEffect(() => {
+        fetchServices(); fetchStatus(); fetchHistory(); fetchNotifications();
+        pollRef.current = setInterval(() => {
+            fetchServices();
+            fetchStatus();
+        }, 5000);
+        return () => clearInterval(pollRef.current);
+    }, [fetchServices, fetchStatus, fetchHistory, fetchNotifications]);
+
+    useEffect(() => { fetchRecommendation(selectedServiceId); }, [selectedServiceId, fetchRecommendation]);
 
     const handleLogout = () => {
         sessionStorage.removeItem("token");
@@ -26,363 +95,338 @@ const UserHome = () => {
         window.location.href = "/";
     };
 
-    // Nav tab
-    const [page, setPage] = useState("dashboard");
-
-    // DATA FROM BACKEND
-    const [services, setServices] = useState([]);
-    const [currentQueue, setCurrentQueue] = useState({ inQueue: false });
-    const [history, setHistory] = useState([]);
-    const [backendNotifs, setBackendNotifs] = useState([]);
-
-    // For the Smart Feature
-    const [recommendation, setRecommendation] = useState(null);
-    const [bestTime, setBestTime] = useState(null);
-
-    // Join Queue
-    const [selectedServiceId, setSelectedServiceId] = useState("");
-
-    // Fetches all services
-    const fetchServices = useCallback(async () => {
-        try {
-            const res = await fetch(`${API}/services`, { headers: authHeaders() });
-            setServices(await res.json());
-        } catch {
-            notify("Error loading services.");
-        }
-    }, []);
-
-    // Fetch the user's current queue status
-    const fetchStatus = useCallback(async () => {
-        try {
-            const res = await fetch(`${API}/queue/status/${userId}`, { headers: authHeaders() });
-            const data = await res.json();
-            setCurrentQueue(data);
-        } catch {
-            notify("Error loading queue status.");
-        }
-    }, [userId]);
-
-    // Fetch user history
-    const fetchHistory = useCallback(async () => {
-        try {
-            const res = await fetch(`${API}/history/${userId}`, { headers: authHeaders() });
-            setHistory(await res.json());
-        } catch {
-            notify("Error loading history.");
-        }
-    }, [userId]);
-
-    // Fetch backend notifications
-    const fetchNotifications = useCallback(async () => {
-        try {
-            const res = await fetch(`${API}/notifications/${userId}`, { headers: authHeaders() });
-            setBackendNotifs(await res.json());
-        } catch {
-            // silently ignore – notifications are non-critical
-        }
-    }, [userId]);
-
-    // Smart Feature: fetch recommendation when a service is selected
-    const fetchRecommendation = useCallback(async (serviceId) => {
-        if (!serviceId) { setRecommendation(null); setBestTime(null); return; }
-        try {
-            const [recRes, timeRes] = await Promise.all([
-                fetch(`${API}/smart/recommend/${serviceId}`, { headers: authHeaders() }),
-                fetch(`${API}/smart/best-time/${serviceId}`, { headers: authHeaders() }),
-            ]);
-            const recData  = await recRes.json();
-            const timeData = await timeRes.json();
-            if (recRes.ok)  setRecommendation(recData);
-            if (timeRes.ok) setBestTime(timeData);
-        } catch {}
-    }, []);
-
-    // Load everything on mount
-    useEffect(() => {
-        fetchServices();
-        fetchStatus();
-        fetchHistory();
-        fetchNotifications();
-    }, [fetchServices, fetchStatus, fetchHistory, fetchNotifications]);
-
-    // Fetches smart data whenever service selection changes
-    useEffect(() => {
-        fetchRecommendation(selectedServiceId);
-    }, [selectedServiceId, fetchRecommendation]);
-
-    // Derived values
-    const activeServices = useMemo(() => services.filter((s) => s.is_open), [services]);
-
-    const selectedService = useMemo(() => {
-        const idNum = Number(selectedServiceId);
-        return services.find((s) => s.id === idNum) || null;
-    }, [selectedServiceId, services]);
-
-    // Join a queue
     const handleJoinQueue = async () => {
-        if (!selectedService) { notify("Please select a service."); return; }
-        if (!selectedService.is_open) { notify("This service is currently closed."); return; }
-        if (currentQueue.inQueue) { notify("You are already in a queue. Leave first."); return; }
+        const svc = services.find(s => s.id === Number(selectedServiceId));
+        if (!svc)           return notify("Please select a service.");
+        if (!svc.is_open)   return notify("This service is currently closed.");
+        if (currentQueue.inQueue) return notify("You are already in a queue. Leave it first.");
 
+        setJoining(true);
         try {
-            const res = await fetch(`${API}/queue/join`, {
+            const res  = await fetch(`${API}/queue/join`, {
                 method: "POST",
                 headers: authHeaders(),
-                body: JSON.stringify({ serviceId: selectedService.id }),
+                body: JSON.stringify({ serviceId: svc.id }),
             });
             const data = await res.json();
-            if (!res.ok) { notify(data.error); return; }
-
-            notify(`Joined ${selectedService.name} queue. You are #${data.position}.`);
+            if (!res.ok) return notify(data.error);
+            notify(`✓ Joined ${svc.name}! You are #${data.position}`);
             await fetchStatus();
             await fetchServices();
             await fetchNotifications();
             setPage("status");
-        } catch {
-            notify("Error joining queue.");
-        }
+        } catch { notify("Error joining queue."); }
+        finally { setJoining(false); }
     };
 
-    // Leave queue
     const handleLeaveQueue = async () => {
-        if (!currentQueue.inQueue) { notify("You are not in a queue."); return; }
-
+        if (!currentQueue.inQueue) return notify("You are not in a queue.");
+        setLeaving(true);
         try {
-            const res = await fetch(`${API}/queue/leave`, {
-                method: "POST",
-                headers: authHeaders(),
-            });
+            const res  = await fetch(`${API}/queue/leave`, { method: "POST", headers: authHeaders() });
             const data = await res.json();
-            if (!res.ok) { notify(data.error); return; }
-
-            notify("Left the queue.");
+            if (!res.ok) return notify(data.error);
+            notify("You have left the queue.");
             await fetchStatus();
             await fetchServices();
             await fetchHistory();
-        } catch {
-            notify("Error leaving queue.");
-        }
+        } catch { notify("Error leaving queue."); }
+        finally { setLeaving(false); }
     };
 
-    // Mark all notifications read
-    const handleMarkAllRead = async () => {
-        try {
-            await fetch(`${API}/notifications/user/${userId}/read-all`, { method: "PATCH" });
-            fetchNotifications();
-        } catch { /* ignore */ }
-    };
+    const activeServices = useMemo(() => services.filter(s => s.is_open), [services]);
+    const unreadCount    = notifications.filter(n => !n["Is Read"]).length;
+    const selectedService = useMemo(() => services.find(s => s.id === Number(selectedServiceId)) || null, [selectedServiceId, services]);
 
-    const unreadCount = backendNotifs.filter((n) => !n["Is Read"]).length;
+    const navItems = [
+        { key: "dashboard", label: "Dashboard" },
+        { key: "join",      label: "Join Queue" },
+        { key: "status",    label: currentQueue.inQueue ? `Queue Status • #${currentQueue.position}` : "Queue Status" },
+        { key: "history",   label: "History" },
+    ];
 
     return (
-        <div className="user-home-background">
-            <div className="login-sign-container">
-                <div className="header">
-                    User Portal
-                    <div className="underline"></div>
+        <div className="theme-light user-layout" style={{ width: "100%" }}>
+            {/* Topbar */}
+            <header className="user-topbar">
+                <div className="topbar-logo">Queue<span>Smart</span></div>
+                <div className="topbar-right">
+                    <span className="user-badge">👤 {userName}</span>
+                    <button className="logout-btn" onClick={handleLogout}>Logout</button>
                 </div>
+            </header>
 
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: "8px" }}>
-                    <button className="submit" onClick={handleLogout}>Logout</button>
-                </div>
+            {/* Nav tabs */}
+            <nav className="user-nav">
+                {navItems.map(item => (
+                    <button
+                        key={item.key}
+                        className={`user-nav-item ${page === item.key ? "active" : ""}`}
+                        onClick={() => {
+                            setPage(item.key);
+                            if (item.key === "status")    fetchStatus();
+                            if (item.key === "history")   fetchHistory();
+                            if (item.key === "dashboard") { fetchServices(); fetchStatus(); fetchNotifications(); }
+                            if (item.key === "join")      fetchServices();
+                        }}
+                    >
+                        {item.label}
+                        {item.key === "dashboard" && unreadCount > 0 && (
+                            <span style={{ marginLeft: "6px", background: "var(--accent)", color: "white", borderRadius: "10px", padding: "1px 6px", fontSize: "0.7rem" }}>
+                                {unreadCount}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </nav>
 
-                {notification && (
-                    <div className="login-sign-container">{notification}</div>
-                )}
+            {toast && <div className="toast">{toast}</div>}
 
-                {/* Navigation Tabs */}
-                <div className="submit-box">
-                    <button className="submit" onClick={() => { setPage("dashboard"); fetchServices(); fetchStatus(); }}>
-                        Dashboard
-                    </button>
-                    <button className="submit" onClick={() => { setPage("join"); fetchServices(); }}>
-                        Join Queue
-                    </button>
-                    <button className="submit" onClick={() => { setPage("status"); fetchStatus(); }}>
-                        Queue Status
-                    </button>
-                    <button className="submit" onClick={() => { setPage("history"); fetchHistory(); }}>
-                        History
-                    </button>
-                </div>
+            <div className="user-content">
 
-                {/* Dashboard */}
+                {/* ── DASHBOARD ── */}
                 {page === "dashboard" && (
                     <div>
-                        <h2>Overview</h2>
+                        <h2 className="page-title">Overview</h2>
 
-                        <div className="card">
-                            <h3>Current Queue Status</h3>
-                            {!currentQueue.inQueue ? (
-                                <p>You are not currently in a queue.</p>
-                            ) : (
-                                <>
-                                    <p>Service: <b>{currentQueue.service_name}</b></p>
-                                    <p>Position: <b>{currentQueue.position}</b></p>
-                                    <p>Estimated Wait: <b>{currentQueue.estimated_wait} minutes</b></p>
-                                    <p>Status: <b>{currentQueue.status}</b></p>
-                                    <button onClick={handleLeaveQueue}>Leave Queue</button>
-                                </>
-                            )}
-                        </div>
+                        {/* Queue banner */}
+                        {currentQueue.inQueue ? (
+                            <div className="queue-banner">
+                                <div className="queue-info">
+                                    <h3>Currently in queue</h3>
+                                    <div className="queue-service">{currentQueue.service_name}</div>
+                                </div>
+                                <div className="queue-stats">
+                                    <div className="stat-item">
+                                        <div className="val">#{currentQueue.position}</div>
+                                        <div className="lbl">Position</div>
+                                    </div>
+                                    <div className="stat-item">
+                                        <div className="val">{currentQueue.estimated_wait}m</div>
+                                        <div className="lbl">Est. Wait</div>
+                                    </div>
+                                </div>
+                                <button className="btn btn-danger btn-sm" onClick={handleLeaveQueue} disabled={leaving}>
+                                    {leaving ? "Leaving..." : "Leave Queue"}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="card" style={{ textAlign: "center", padding: "28px" }}>
+                                <p style={{ color: "var(--muted)", marginBottom: "12px" }}>You are not currently in any queue.</p>
+                                <button className="btn btn-primary btn-sm" onClick={() => setPage("join")}>
+                                    Join a Queue →
+                                </button>
+                            </div>
+                        )}
 
+                        {/* Active services */}
                         <div className="card">
-                            <h3>Active Services Available</h3>
+                            <h3>Open Services ({activeServices.length})</h3>
                             {activeServices.length === 0 ? (
-                                <p>No services are currently open.</p>
+                                <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>No services are currently open.</p>
                             ) : (
-                                activeServices.map((s) => (
-                                    <div key={s.id} style={{ marginBottom: "10px" }}>
-                                        <b>{s.name}</b> — {s.description}
-                                        <div>Expected Duration: {s.expected_duration} min</div>
+                                activeServices.map(s => (
+                                    <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+                                        <div>
+                                            <div style={{ fontWeight: 600 }}>{s.name}</div>
+                                            <div style={{ fontSize: "0.82rem", color: "var(--muted)" }}>{s.description}</div>
+                                        </div>
+                                        <div style={{ textAlign: "right" }}>
+                                            <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{Number(s.queue_length) || 0} waiting</div>
+                                            <div style={{ fontSize: "0.78rem", color: "var(--muted)" }}>{s.expected_duration} min avg</div>
+                                        </div>
                                     </div>
                                 ))
                             )}
                         </div>
 
-                        <div className="card">
-                            <h3>Notifications {unreadCount > 0 && <span>({unreadCount} unread)</span>}</h3>
-                            {backendNotifs.length === 0 ? (
-                                <p>No notifications.</p>
-                            ) : (
-                                <>
-                                    {backendNotifs.slice(0, 3).map((n) => (
-                                        <p key={n.id} style={{ fontWeight: n["Is Read"] ? "normal" : "bold" }}>
-                                            {n.Message}
-                                        </p>
-                                    ))}
-                                    {unreadCount > 0 && (
-                                        <button onClick={handleMarkAllRead}>Mark All Read</button>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Join a queue */}
-                {page === "join" && (
-                    <div>
-                        <h2>Join a Queue</h2>
-                        <div className="card">
-                            <label>
-                                Select a Service (required):
-                                <select
-                                    value={selectedServiceId}
-                                    onChange={(e) => setSelectedServiceId(e.target.value)}
-                                    style={{ display: "block", marginTop: "8px" }}
-                                >
-                                    <option value="">-- Select service --</option>
-                                    {services.map((s) => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.name} ({s.is_open ? "Open" : "Closed"})
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-
-                            {selectedService && (
-                                <div style={{ marginTop: "12px" }}>
-                                    <h3>{selectedService.name}</h3>
-                                    <p>{selectedService.description}</p>
-                                    <p>Expected Duration: <b>{selectedService.expected_duration} min</b></p>
-                                </div>
-                            )}
-
-                            {/* SMART FEATURE — Alternative Service Recommendation */}
-                            {recommendation && recommendation.has_alternatives && (
-                                <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "#fff8e1", borderRadius: "8px", border: "1px solid #ffe082" }}>
-                                    <h4 style={{ margin: "0 0 8px 0" }}>💡 Smart Suggestion</h4>
-                                    <p style={{ margin: "0 0 8px 0" }}>
-                                        Your selected service has an estimated wait of <b>{recommendation.selected_service.estimated_wait} min</b>.
-                                        These alternatives have shorter wait times:
-                                    </p>
-                                    {recommendation.alternatives.map(alt => (
-                                        <div key={alt.id} style={{ marginBottom: "8px", padding: "8px", backgroundColor: "#f1f8e9", borderRadius: "6px" }}>
-                                            <b>{alt.name}</b> — {alt.estimated_wait} min wait
-                                            <span style={{ color: "green", marginLeft: "8px" }}>
-                                                (saves {alt.time_saved} min)
-                                            </span>
-                                            <button
-                                                style={{ marginLeft: "12px" }}
-                                                onClick={() => setSelectedServiceId(String(alt.id))}
-                                            >
-                                                Switch
-                                            </button>
+                        {/* Notifications */}
+                        {notifications.length > 0 && (
+                            <div className="card">
+                                <h3>Recent Notifications {unreadCount > 0 && <span style={{ color: "var(--accent)", fontSize: "0.85rem" }}>({unreadCount} new)</span>}</h3>
+                                {notifications.slice(0, 4).map(n => (
+                                    <div key={n.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: "0.88rem", fontWeight: n["Is Read"] ? 400 : 600 }}>
+                                        {n.Message}
+                                        <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "2px" }}>
+                                            {new Date(n["Created/Sent"]).toLocaleString()}
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* SMART FEATURE — Best Time Suggestion */}
-                            {bestTime && bestTime.best_hours && bestTime.best_hours.length > 0 && (
-                                <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "#e3f2fd", borderRadius: "8px", border: "1px solid #90caf9" }}>
-                                    <h4 style={{ margin: "0 0 8px 0" }}>🕐 Best Time to Join</h4>
-                                    <p style={{ margin: 0 }}>{bestTime.suggestion}</p>
-                                </div>
-                            )}
-
-                            <div className="submit-box" style={{ marginTop: "12px" }}>
-                                {!currentQueue.inQueue ? (
-                                    <button className="submit" onClick={handleJoinQueue}>Join Queue</button>
-                                ) : (
-                                    <button className="submit" onClick={handleLeaveQueue}>Leave Current Queue</button>
-                                )}
-                            </div>
-
-                            {currentQueue.inQueue && (
-                                <p style={{ marginTop: "10px" }}>
-                                    You are currently in <b>{currentQueue.serviceName}</b>. Go to <b>Queue Status</b>.
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Queue Status */}
-                {page === "status" && (
-                    <div>
-                        <h2>Queue Status</h2>
-                        {!currentQueue.inQueue ? (
-                            <div className="card">
-                                <p>You are not currently in a queue.</p>
-                                <button onClick={() => setPage("join")}>Go Join a Queue</button>
-                            </div>
-                        ) : (
-                            <div className="card">
-                                <p>Service: <b>{currentQueue.service_name}</b></p>
-                                <p>Current Position: <b>{currentQueue.position}</b></p>
-                                <p>Estimated Wait Time: <b>{currentQueue.estimated_wait} minutes</b></p>
-                                <p>Status: <b>{currentQueue.status}</b></p>
-                                <p style={{ color: "#888", fontSize: "0.85em" }}>
-                                    Status updates in real deployments: your position updates automatically
-                                    when the admin serves users ahead of you.
-                                </p>
-                                <button onClick={handleLeaveQueue} style={{ marginTop: "12px" }}>
-                                    Leave Queue
-                                </button>
-                                <button onClick={fetchStatus} style={{ marginTop: "8px", marginLeft: "8px" }}>
-                                    Refresh
-                                </button>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* History */}
+                {/* ── JOIN QUEUE ── */}
+                {page === "join" && (
+                    <div>
+                        <h2 className="page-title">Join a Queue</h2>
+
+                        {currentQueue.inQueue && (
+                            <div style={{ background: "rgba(9,105,218,0.08)", border: "1px solid rgba(9,105,218,0.2)", borderRadius: "var(--radius)", padding: "12px 16px", marginBottom: "16px", fontSize: "0.9rem" }}>
+                                ℹ You are currently in <b>{currentQueue.service_name}</b> (Position #{currentQueue.position}).
+                                You must leave before joining another queue.
+                                <button className="btn btn-danger btn-sm" style={{ marginLeft: "12px" }} onClick={handleLeaveQueue} disabled={leaving}>
+                                    {leaving ? "..." : "Leave Queue"}
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="card">
+                            <div className="form-group">
+                                <label>Select a Service</label>
+                                <select
+                                    className="service-select"
+                                    value={selectedServiceId}
+                                    onChange={e => setSelectedServiceId(e.target.value)}
+                                    disabled={currentQueue.inQueue}
+                                >
+                                    <option value="">-- Choose a service --</option>
+                                    {services.map(s => (
+                                        <option key={s.id} value={s.id} disabled={!s.is_open}>
+                                            {s.name} — {s.is_open ? `${Number(s.queue_length) || 0} waiting · ~${(Number(s.queue_length) + 1) * s.expected_duration}m wait` : "CLOSED"}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Service details */}
+                            {selectedService && (
+                                <div className="service-detail-card">
+                                    <div className="detail-item">
+                                        <div className="lbl">Service</div>
+                                        <div className="val">{selectedService.name}</div>
+                                    </div>
+                                    <div className="detail-item">
+                                        <div className="lbl">Status</div>
+                                        <div className="val">
+                                            <span className={`badge ${selectedService.is_open ? "open" : "closed"}`}>
+                                                {selectedService.is_open ? "Open" : "Closed"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="detail-item">
+                                        <div className="lbl">People Waiting</div>
+                                        <div className="val">{Number(selectedService.queue_length) || 0}
+                                            {selectedService.max_capacity ? ` / ${selectedService.max_capacity}` : ""}
+                                        </div>
+                                    </div>
+                                    <div className="detail-item">
+                                        <div className="lbl">Your Est. Wait</div>
+                                        <div className="val" style={{ color: "var(--accent)" }}>
+                                            ~{(Number(selectedService.queue_length) + 1) * selectedService.expected_duration} min
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Smart suggestion */}
+                            {recommendation?.has_alternatives && (
+                                <div className="smart-card yellow">
+                                    <h4>💡 Shorter wait available</h4>
+                                    <p style={{ fontSize: "0.85rem", marginBottom: "10px", color: "var(--text)" }}>
+                                        Your selected service has ~{recommendation.selected_service.estimated_wait} min wait. Try one of these:
+                                    </p>
+                                    {recommendation.alternatives.map(alt => (
+                                        <div key={alt.id} className="alt-service">
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{alt.name}</div>
+                                                <div style={{ fontSize: "0.78rem", color: "var(--muted)" }}>~{alt.estimated_wait} min wait</div>
+                                            </div>
+                                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                                <span className="save-tag">saves {alt.time_saved} min</span>
+                                                <button className="btn btn-ghost btn-sm" onClick={() => setSelectedServiceId(String(alt.id))}>
+                                                    Switch
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {bestTime?.best_hours?.length > 0 && (
+                                <div className="smart-card blue">
+                                    <h4>🕐 Best time to join</h4>
+                                    <p style={{ fontSize: "0.85rem", color: "var(--text)" }}>{bestTime.suggestion}</p>
+                                </div>
+                            )}
+
+                            <button
+                                className="btn btn-primary btn-full"
+                                onClick={handleJoinQueue}
+                                disabled={joining || currentQueue.inQueue || !selectedServiceId || (selectedService && !selectedService.is_open)}
+                                style={{ marginTop: "8px" }}
+                            >
+                                {joining ? "Joining..." : currentQueue.inQueue ? "Leave current queue first" : "Join Queue"}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── QUEUE STATUS ── */}
+                {page === "status" && (
+                    <div>
+                        <h2 className="page-title">Queue Status</h2>
+
+                        {!currentQueue.inQueue ? (
+                            <div className="card" style={{ textAlign: "center", padding: "32px" }}>
+                                <p style={{ color: "var(--muted)", marginBottom: "16px" }}>You are not currently in any queue.</p>
+                                <button className="btn btn-primary btn-sm" onClick={() => setPage("join")}>Join a Queue →</button>
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="queue-banner">
+                                    <div className="queue-info">
+                                        <h3>You are in queue</h3>
+                                        <div className="queue-service">{currentQueue.service_name}</div>
+                                    </div>
+                                    <div className="queue-stats">
+                                        <div className="stat-item">
+                                            <div className="val">#{currentQueue.position}</div>
+                                            <div className="lbl">Position</div>
+                                        </div>
+                                        <div className="stat-item">
+                                            <div className="val">{currentQueue.estimated_wait}m</div>
+                                            <div className="lbl">Est. Wait</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="card">
+                                    <p style={{ fontSize: "0.85rem", color: "var(--muted)", marginBottom: "16px" }}>
+                                        Your position updates automatically every 5 seconds. Click Refresh to update now.
+                                    </p>
+                                    <div style={{ display: "flex", gap: "10px" }}>
+                                        <button className="btn btn-ghost" onClick={fetchStatus}>↻ Refresh</button>
+                                        <button className="btn btn-danger" onClick={handleLeaveQueue} disabled={leaving}>
+                                            {leaving ? "Leaving..." : "Leave Queue"}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── HISTORY ── */}
                 {page === "history" && (
                     <div>
-                        <h2>History</h2>
+                        <h2 className="page-title">Queue History</h2>
                         <div className="card">
                             {history.length === 0 ? (
-                                <p>No history yet.</p>
+                                <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>No history yet.</p>
                             ) : (
-                                history.map((h) => (
-                                    <div key={h.id} style={{ marginBottom: "12px" }}>
-                                        <div><b>{h.service_name}</b></div>
-                                        <div>Date: {h.date}</div>
-                                        <div>Outcome: {h.Outcome}</div>
+                                history.map(h => (
+                                    <div key={h.id} className="history-item">
+                                        <div>
+                                            <div style={{ fontWeight: 600 }}>{h.service_name}</div>
+                                            <div style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+                                                {new Date(h.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                                            </div>
+                                        </div>
+                                        <span className={h.Outcome === "served" ? "outcome-served" : "outcome-left"}>
+                                            {h.Outcome === "served" ? "✓ Served" : "↩ Left"}
+                                        </span>
                                     </div>
                                 ))
                             )}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import './admin_home.css'
 
 const API = "http://localhost:5001/api";
 const token = () => sessionStorage.getItem("token");
@@ -87,7 +88,6 @@ const ReportsPage = ({ notify }) => {
 
     return (
         <div>
-            <h2>Reports</h2>
 
             {/* Report Tabs */}
             <div className="submit-box" style={{ marginBottom: "16px" }}>
